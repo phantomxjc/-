@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>五子棋 - 选择模式</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 50%, #0d2040 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #e0e0e0;
+      overflow: hidden;
+    }
+
+    /* 背景粒子（纯CSS） */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at 20% 50%, rgba(120,80,255,0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 20%, rgba(255,200,50,0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .logo {
+      font-size: 3.5rem;
+      font-weight: 900;
+      letter-spacing: 8px;
+      background: linear-gradient(135deg, #f5c518, #ff9800, #f5c518);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      margin-bottom: 8px;
+      animation: glow 3s ease-in-out infinite alternate;
+    }
+    @keyframes glow {
+      from { filter: drop-shadow(0 0 8px rgba(245,197,24,0.3)); }
+      to   { filter: drop-shadow(0 0 24px rgba(245,197,24,0.7)); }
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: #888;
+      letter-spacing: 3px;
+      margin-bottom: 60px;
+    }
+
+    /* 模式卡片区 */
+    .mode-cards {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+
+    .mode-card {
+      width: 240px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 36px 24px 28px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .mode-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 50%, rgba(245,197,24,0.05));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .mode-card:hover::before { opacity: 1; }
+    .mode-card:hover {
+      border-color: rgba(245,197,24,0.5);
+      transform: translateY(-6px);
+      box-shadow: 0 16px 40px rgba(245,197,24,0.12);
+    }
+    .mode-card.selected {
+      border-color: #f5c518;
+      box-shadow: 0 0 0 2px rgba(245,197,24,0.3), 0 16px 40px rgba(245,197,24,0.15);
+    }
+
+    .mode-icon { font-size: 3rem; margin-bottom: 16px; }
+    .mode-title { font-size: 1.3rem; font-weight: bold; margin-bottom: 8px; color: #fff; }
+    .mode-desc { font-size: 0.85rem; color: #999; line-height: 1.6; }
+
+    /* 难度选择（仅PvC显示） */
+    .difficulty-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 36px;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .difficulty-section.hidden {
+      opacity: 0; pointer-events: none; transform: translateY(-10px);
+    }
+    .diff-label { font-size: 0.9rem; color: #aaa; letter-spacing: 2px; }
+    .diff-btns { display: flex; gap: 12px; }
+    .diff-btn {
+      padding: 10px 28px;
+      border-radius: 30px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: #ccc;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .diff-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .diff-btn.active {
+      background: linear-gradient(135deg, #f5c518, #e6a817);
+      color: #1a1a2e;
+      font-weight: bold;
+      border-color: transparent;
+    }
+
+    /* 房间区（仅PvP显示） */
+    .room-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 36px;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .room-section.hidden {
+      opacity: 0; pointer-events: none; transform: translateY(-10px);
+    }
+    .room-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .room-btn {
+      padding: 10px 28px;
+      border-radius: 30px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: #ccc;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .room-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .room-btn.primary {
+      background: linear-gradient(135deg, #4a9eff, #2176d6);
+      color: #fff;
+      font-weight: bold;
+      border-color: transparent;
+    }
+    .room-input-row {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .room-input {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 1.1rem;
+      letter-spacing: 4px;
+      width: 160px;
+      text-align: center;
+      text-transform: uppercase;
+      outline: none;
+    }
+    .room-input:focus { border-color: #4a9eff; }
+    .room-hint { font-size: 0.8rem; color: #777; }
+
+    /* 开始按钮 */
+    .start-btn {
+      padding: 16px 64px;
+      border-radius: 50px;
+      border: none;
+      background: linear-gradient(135deg, #f5c518, #e6a817);
+      color: #1a1a2e;
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: all 0.25s;
+      box-shadow: 0 4px 20px rgba(245,197,24,0.3);
+    }
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(245,197,24,0.5);
+    }
+    .start-btn:active { transform: translateY(0); }
+    .start-btn:disabled {
+      opacity: 0.4; cursor: not-allowed; transform: none;
+      box-shadow: none;
+    }
+
+    .error-msg {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #ff6b6b;
+      min-height: 20px;
+    }
+
+    @media (max-width: 560px) {
+      .logo { font-size: 2.5rem; }
+      .mode-card { width: 155px; padding: 24px 14px 20px; }
+      .mode-icon { font-size: 2rem; }
+      .mode-title { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo">五子棋</div>
+  <div class="subtitle">GOMOKU · 请选择游戏模式</div>
+
+  <!-- 模式卡片 -->
+  <div class="mode-cards">
+    <div class="mode-card selected" data-mode="pvc" onclick="selectMode('pvc')">
+      <div class="mode-icon">🤖</div>
+      <div class="mode-title">人机对战</div>
+      <div class="mode-desc">与 AI 对弈<br>支持三个难度等级</div>
+    </div>
+    <div class="mode-card" data-mode="pvp" onclick="selectMode('pvp')">
+      <div class="mode-icon">👥</div>
+      <div class="mode-title">真人对战</div>
+      <div class="mode-desc">创建或加入房间<br>与好友在线对弈</div>
+    </div>
+  </div>
+
+  <!-- 难度选择（PvC） -->
+  <div class="difficulty-section" id="diffSection">
+    <div class="diff-label">选择 AI 难度</div>
+    <div class="diff-btns">
+      <button class="diff-btn" data-diff="easy" onclick="selectDiff('easy')">😊 简单</button>
+      <button class="diff-btn active" data-diff="medium" onclick="selectDiff('medium')">🎯 一般</button>
+      <button class="diff-btn" data-diff="hard" onclick="selectDiff('hard')">💀 困难</button>
+    </div>
+  </div>
+
+  <!-- 房间操作（PvP） -->
+  <div class="room-section hidden" id="roomSection">
+    <div class="diff-label">房间操作</div>
+    <div class="room-btns">
+      <button class="room-btn primary" onclick="createRoom()">🏠 创建新房间</button>
+    </div>
+    <div class="room-input-row">
+      <input class="room-input" id="roomCodeInput" maxlength="6" placeholder="房间码"
+             oninput="this.value=this.value.toUpperCase()" />
+      <button class="room-btn" onclick="joinRoom()">🚪 加入房间</button>
+    </div>
+    <div class="room-hint">输入6位房间码加入好友的房间</div>
+  </div>
+
+  <button class="start-btn" id="startBtn" onclick="startGame()">开始游戏</button>
+  <div class="error-msg" id="errMsg"></div>
+
+  <script>
+    let currentMode = 'pvc';
+    let currentDiff = 'medium';
+    let pvpAction  = null;   // 'create' | 'join'
+    let pendingRoomCode = null;
+
+    function selectMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-card').forEach(c =>
+        c.classList.toggle('selected', c.dataset.mode === mode));
+      document.getElementById('diffSection').classList.toggle('hidden', mode !== 'pvc');
+      document.getElementById('roomSection').classList.toggle('hidden', mode !== 'pvp');
+      document.getElementById('errMsg').textContent = '';
+    }
+
+    function selectDiff(diff) {
+      currentDiff = diff;
+      document.querySelectorAll('.diff-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.diff === diff));
+    }
+
+    async function createRoom() {
+      setErr('');
+      const btn = document.querySelector('.start-btn');
+      btn.disabled = true;
+      btn.textContent = '创建中...';
+      try {
+        const res = await fetch('/api/pvp/create', { method: 'POST',
+          headers: {'Content-Type': 'application/json'}, body: '{}' });
+        const data = await res.json();
+        if (data.error) { setErr(data.error); btn.disabled = false; btn.textContent = '开始游戏'; return; }
+        // 跳转到游戏页等待对手
+        window.location.href = `/game?mode=pvp&room=${data.code}`;
+      } catch(e) {
+        setErr('网络错误，请重试'); btn.disabled = false; btn.textContent = '开始游戏';
+      }
+    }
+
+    async function joinRoom() {
+      setErr('');
+      const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+      if (code.length !== 6) { setErr('请输入6位房间码'); return; }
+      const btn = document.querySelector('.start-btn');
+      btn.disabled = true; btn.textContent = '加入中...';
+      try {
+        const res = await fetch('/api/pvp/join', { method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ code }) });
+        const data = await res.json();
+        if (data.error) { setErr(data.error); btn.disabled = false; btn.textContent = '开始游戏'; return; }
+        window.location.href = `/game?mode=pvp&room=${code}`;
+      } catch(e) {
+        setErr('网络错误，请重试'); btn.disabled = false; btn.textContent = '开始游戏';
+      }
+    }
+
+    function startGame() {
+      if (currentMode === 'pvc') {
+        window.location.href = `/game?mode=pvc&difficulty=${currentDiff}`;
+      } else {
+        // PvP 模式点"开始游戏"提示要先创建或加入
+        setErr('请先点击「创建新房间」或输入房间码后点「加入房间」');
+      }
+    }
+
+    function setErr(msg) {
+      document.getElementById('errMsg').textContent = msg;
+    }
+  </script>
+</body>
+</html>

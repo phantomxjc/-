@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>五子棋 - 对局</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 50%, #0d2040 100%);
+      display: flex; flex-direction: column;
+      align-items: center;
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #e0e0e0;
+      padding: 16px 8px 32px;
+    }
+
+    /* ── 顶部栏 ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 14px;
+    }
+    .back-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #ccc; border-radius: 10px;
+      padding: 8px 14px; cursor: pointer; font-size: 0.88rem;
+      transition: all 0.2s; text-decoration: none;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
+
+    .game-title {
+      font-size: 1.1rem; font-weight: bold;
+      color: #f5c518; letter-spacing: 2px;
+    }
+
+    .action-btns { display: flex; gap: 8px; }
+    .act-btn {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #ccc; border-radius: 10px;
+      padding: 8px 14px; cursor: pointer; font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .act-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+    /* ── 状态栏 ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%; max-width: 640px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 10px 18px;
+      margin-bottom: 12px;
+      gap: 10px;
+    }
+
+    .player-tag {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 20px;
+      border: 2px solid transparent;
+      transition: border-color 0.25s, background 0.25s;
+      font-size: 0.9rem;
+    }
+    .player-tag.active {
+      border-color: #f5c518;
+      background: rgba(245,197,24,0.08);
+    }
+    .stone-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25);
+    }
+    .stone-dot.black { background: radial-gradient(circle at 35% 35%, #888, #111); }
+    .stone-dot.white { background: radial-gradient(circle at 35% 35%, #fff, #bbb); }
+
+    .center-msg {
+      flex: 1; text-align: center;
+      font-size: 0.9rem; color: #f5c518;
+      min-width: 0; word-break: break-all;
+    }
+
+    /* ── 房间码显示 ── */
+    .room-badge {
+      background: rgba(74,158,255,0.12);
+      border: 1px solid rgba(74,158,255,0.3);
+      border-radius: 10px; padding: 6px 14px;
+      font-size: 0.82rem; color: #4a9eff;
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .room-badge:hover { background: rgba(74,158,255,0.2); }
+    .room-badge.hidden { display: none; }
+    #roomCode { font-weight: bold; letter-spacing: 3px; }
+
+    /* ── 等待提示 ── */
+    .waiting-banner {
+      width: 100%; max-width: 640px;
+      background: rgba(74,158,255,0.08);
+      border: 1px dashed rgba(74,158,255,0.4);
+      border-radius: 12px; padding: 14px 20px;
+      text-align: center; color: #4a9eff;
+      font-size: 0.9rem; margin-bottom: 12px;
+    }
+    .waiting-banner.hidden { display: none; }
+    .blink { animation: blink 1.2s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Canvas 区 ── */
+    .board-wrap {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      cursor: crosshair;
+      border-radius: 6px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+    }
+
+    /* ── 结束遮罩 ── */
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.72);
+      border-radius: 6px;
+      backdrop-filter: blur(6px);
+      gap: 18px;
+    }
+    .overlay.hidden { display: none; }
+    .overlay-title {
+      font-size: 1.8rem; font-weight: bold;
+      color: #f5c518;
+      text-shadow: 0 0 24px rgba(245,197,24,0.7);
+    }
+    .overlay-btns { display: flex; gap: 12px; }
+    .ov-btn {
+      padding: 12px 28px; border-radius: 30px; border: none;
+      font-size: 1rem; font-weight: bold; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ov-btn.primary {
+      background: linear-gradient(135deg, #f5c518, #e6a817);
+      color: #1a1a2e;
+    }
+    .ov-btn.secondary {
+      background: rgba(255,255,255,0.1);
+      color: #ccc; border: 1px solid rgba(255,255,255,0.2);
+    }
+    .ov-btn:hover { transform: translateY(-2px); }
+
+    /* ── AI 思考动画 ── */
+    .thinking-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.25);
+      border-radius: 6px;
+    }
+    .thinking-overlay.hidden { display: none; }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 4px solid rgba(245,197,24,0.2);
+      border-top-color: #f5c518;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部栏 -->
+  <div class="topbar">
+    <a class="back-btn" href="/">← 返回</a>
+    <div class="game-title" id="gameTitle">五子棋对局</div>
+    <div class="action-btns">
+      <button class="act-btn" id="undoBtn" onclick="doUndo()">↩ 悔棋</button>
+      <button class="act-btn" onclick="doRestart()">↺ 重开</button>
+    </div>
+  </div>
+
+  <!-- 状态栏 -->
+  <div class="status-bar">
+    <div class="player-tag" id="blackTag">
+      <div class="stone-dot black"></div>
+      <span id="blackName">黑棋</span>
+    </div>
+    <div class="center-msg" id="centerMsg">加载中...</div>
+    <div class="player-tag" id="whiteTag">
+      <div class="stone-dot white"></div>
+      <span id="whiteName">白棋</span>
+    </div>
+  </div>
+
+  <!-- 房间码 & 等待提示（PvP） -->
+  <div class="room-badge hidden" id="roomBadge" title="点击复制房间码" onclick="copyRoomCode()">
+    🏠 房间码：<span id="roomCode"></span>
+  </div>
+  <div class="waiting-banner hidden" id="waitingBanner">
+    <span class="blink">⏳</span> 等待对手加入... 将房间码分享给好友吧！
+  </div>
+
+  <!-- 棋盘 -->
+  <div class="board-wrap" style="margin-top:10px;">
+    <canvas id="boardCanvas"></canvas>
+    <div class="overlay hidden" id="gameOverlay">
+      <div class="overlay-title" id="overlayTitle">游戏结束</div>
+      <div class="overlay-btns">
+        <button class="ov-btn primary" onclick="doRestart()">再来一局</button>
+        <button class="ov-btn secondary" onclick="location.href='/'">返回主页</button>
+      </div>
+    </div>
+    <div class="thinking-overlay hidden" id="thinkOverlay">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <script>
+  /* ================================================================
+     五子棋游戏前端 v2 — 支持 PvC / PvP 双模式
+  ================================================================ */
+  const BOARD_SIZE = 15;
+  const CELL = 40, PAD = 28;
+  const CW = CELL * (BOARD_SIZE - 1) + PAD * 2;
+  const SR = 17;
+
+  const canvas = document.getElementById('boardCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.height = CW;
+
+  // 自适应
+  function resize() {
+    const s = Math.min(window.innerWidth - 16, 580);
+    canvas.style.width = canvas.style.height = (CW * s / CW > 1 ? s : CW * s / CW) + 'px';
+    const scale = Math.min(s, CW) / CW;
+    canvas.style.width  = (CW * scale) + 'px';
+    canvas.style.height = (CW * scale) + 'px';
+  }
+  resize(); window.addEventListener('resize', resize);
+
+  // ── 从 URL 读取参数 ──────────────────────────────
+  const params = new URLSearchParams(location.search);
+  const MODE       = params.get('mode') || 'pvc';
+  const DIFFICULTY = params.get('difficulty') || 'medium';
+  const ROOM_CODE  = (params.get('room') || '').toUpperCase();
+
+  const DIFF_LABEL = { easy: '简单', medium: '一般', hard: '困难' };
+
+  // ── 游戏状态 ─────────────────────────────────────
+  let gs = null;       // 最新服务器状态
+  let lastMove = null; // [row, col]
+  let busy = false;
+  let pollTimer = null;
+  let lastVersion = 0;
+
+  // ── 初始化 ───────────────────────────────────────
+  async function init() {
+    if (MODE === 'pvc') {
+      document.getElementById('gameTitle').textContent = `人机对战 · ${DIFF_LABEL[DIFFICULTY]}`;
+      document.getElementById('blackName').textContent = '你（黑棋）';
+      document.getElementById('whiteName').textContent = `AI（白棋）`;
+      document.getElementById('undoBtn').style.display = '';
+      await startPvC();
+    } else {
+      document.getElementById('gameTitle').textContent = '真人对战';
+      document.getElementById('undoBtn').style.display = '';
+      document.getElementById('roomBadge').classList.remove('hidden');
+      document.getElementById('roomCode').textContent = ROOM_CODE;
+      await initPvP();
+    }
+    drawBoard();
+    if (gs) renderState();
+  }
+
+  // ── PvC ──────────────────────────────────────────
+  async function startPvC() {
+    const data = await api('/api/pvc/new', { difficulty: DIFFICULTY });
+    gs = data;
+    setMsg(data.message || '黑棋先行');
+  }
+
+  // ── PvP ──────────────────────────────────────────
+  async function initPvP() {
+    // 先拉取当前状态（可能已在房间里）
+    const data = await api(`/api/pvp/state?code=${ROOM_CODE}&version=0`, null, 'GET');
+    if (data.error) { setMsg('⚠️ ' + data.error); return; }
+    gs = data;
+    lastVersion = data.version;
+    updatePvPUI();
+    startPolling();
+  }
+
+  function updatePvPUI() {
+    if (!gs) return;
+    // 等待对手
+    if (!gs.is_full) {
+      document.getElementById('waitingBanner').classList.remove('hidden');
+    } else {
+      document.getElementById('waitingBanner').classList.add('hidden');
+    }
+    const myColor = gs.my_color;
+    document.getElementById('blackName').textContent =
+      myColor === 'black' ? '你（黑棋）' : '黑棋（对手）';
+    document.getElementById('whiteName').textContent =
+      myColor === 'white' ? '你（白棋）' : '白棋（对手）';
+  }
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      if (!gs || gs.game_over) { clearInterval(pollTimer); return; }
+      const data = await api(`/api/pvp/state?code=${ROOM_CODE}&version=${lastVersion}`, null, 'GET');
+      if (data.error) return;
+      if (data.version !== lastVersion) {
+        lastVersion = data.version;
+        gs = data;
+        updatePvPUI();
+        renderState();
+      }
+      if (!data.is_full && !document.getElementById('waitingBanner').classList.contains('hidden') === false) {
+        updatePvPUI();
+      }
+    }, 800);
+  }
+
+  // ── 落子 ─────────────────────────────────────────
+  async function handleClick(row, col) {
+    if (busy || !gs || gs.game_over) return;
+    if (!gs.is_full && MODE === 'pvp') { setMsg('等待对手加入...'); return; }
+
+    // PvP：判断是否轮到自己
+    if (MODE === 'pvp') {
+      if (gs.my_color !== gs.current_player) { setMsg('还没轮到你！'); return; }
+    }
+
+    if (gs.board[row][col] !== 0) return;
+
+    busy = true;
+    if (MODE === 'pvc') {
+      document.getElementById('thinkOverlay').classList.remove('hidden');
+    }
+
+    const url = MODE === 'pvc' ? '/api/pvc/move' : '/api/pvp/move';
+    const body = MODE === 'pvc' ? { row, col } : { row, col, code: ROOM_CODE };
+    const data = await api(url, body);
+
+    document.getElementById('thinkOverlay').classList.add('hidden');
+    busy = false;
+
+    if (data.error) { setMsg('⚠️ ' + data.error); return; }
+    lastMove = [row, col];
+    lastVersion = data.version || lastVersion;
+    gs = data;
+    renderState();
+  }
+
+  // ── 悔棋 ─────────────────────────────────────────
+  async function doUndo() {
+    if (busy) return;
+    const url = MODE === 'pvc' ? '/api/pvc/undo' : '/api/pvp/undo';
+    const body = MODE === 'pvp' ? { code: ROOM_CODE } : {};
+    const data = await api(url, body);
+    if (data.error) { setMsg(data.error); return; }
+    lastMove = null;
+    lastVersion = data.version || lastVersion;
+    gs = data;
+    renderState();
+  }
+
+  // ── 重开 ─────────────────────────────────────────
+  async function doRestart() {
+    if (MODE === 'pvc') {
+      lastMove = null;
+      await startPvC();
+      renderState();
+    } else {
+      // PvP 重开回到主页重建房间
+      location.href = '/';
+    }
+  }
+
+  // ── 渲染 ─────────────────────────────────────────
+  function renderState() {
+    drawBoard();
+    if (!gs) return;
+
+    for (let r = 0; r < BOARD_SIZE; r++)
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        const v = gs.board[r][c];
+        if (v === 1) drawStone(r, c, 'black',
+          lastMove && lastMove[0]===r && lastMove[1]===c);
+        else if (v === 2) drawStone(r, c, 'white',
+          lastMove && lastMove[0]===r && lastMove[1]===c);
+      }
+
+    // 指示器
+    document.getElementById('blackTag').classList.toggle('active',
+      !gs.game_over && gs.current_player === 'black');
+    document.getElementById('whiteTag').classList.toggle('active',
+      !gs.game_over && gs.current_player === 'white');
+
+    if (gs.game_over) {
+      const winMap = { draw:'平局！旗鼓相当 🤝', black:'⚫ 黑棋获胜！', white:'⚪ 白棋获胜！' };
+      let msg = winMap[gs.winner] || '游戏结束';
+      if (MODE === 'pvc') {
+        if (gs.winner === 'black') msg = '🎉 你赢了！';
+        if (gs.winner === 'white') msg = '🤖 AI获胜！再战一局？';
+      } else {
+        const mine = gs.my_color;
+        if (gs.winner === mine) msg = '🏆 你赢了！';
+        else if (gs.winner && gs.winner !== 'draw') msg = '😢 你输了！';
+      }
+      document.getElementById('overlayTitle').textContent = msg;
+      document.getElementById('gameOverlay').classList.remove('hidden');
+    } else {
+      document.getElementById('gameOverlay').classList.add('hidden');
+      if (gs.message) setMsg(gs.message);
+      else {
+        const turn = gs.current_player === 'black' ? '黑棋' : '白棋';
+        if (MODE === 'pvp' && gs.my_color) {
+          const isMe = gs.current_player === gs.my_color;
+          setMsg(isMe ? '轮到你落子 ✨' : `等待${turn}落子...`);
+        } else {
+          setMsg('');
+        }
+      }
+    }
+    if (MODE === 'pvp') updatePvPUI();
+  }
+
+  // ── 绘制 ─────────────────────────────────────────
+  function drawBoard() {
+    ctx.fillStyle = '#dcb06b';
+    ctx.fillRect(0, 0, CW, CW);
+    const grad = ctx.createLinearGradient(0,0,CW,CW);
+    grad.addColorStop(0, 'rgba(255,220,160,0.25)');
+    grad.addColorStop(1, 'rgba(180,120,50,0.08)');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,CW,CW);
+
+    ctx.strokeStyle = '#9a7040'; ctx.lineWidth = 1;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      const x = PAD + i * CELL, y = PAD + i * CELL;
+      ctx.beginPath(); ctx.moveTo(x, PAD);
+      ctx.lineTo(x, PAD + (BOARD_SIZE-1)*CELL); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(PAD, y);
+      ctx.lineTo(PAD + (BOARD_SIZE-1)*CELL, y); ctx.stroke();
+    }
+
+    const stars = [[3,3],[3,7],[3,11],[7,3],[7,7],[7,11],[11,3],[11,7],[11,11]];
+    ctx.fillStyle = '#7a5c30';
+    stars.forEach(([r,c]) => {
+      ctx.beginPath();
+      ctx.arc(PAD+c*CELL, PAD+r*CELL, 3.5, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    const L = 'ABCDEFGHJKLMNOP';
+    ctx.fillStyle = '#7a5c30'; ctx.font = '11px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i=0; i<BOARD_SIZE; i++) {
+      ctx.fillText(L[i], PAD+i*CELL, PAD/2);
+      ctx.fillText(BOARD_SIZE-i, PAD/2-2, PAD+i*CELL);
+    }
+  }
+
+  function drawStone(row, col, color, isLast=false) {
+    const x = PAD+col*CELL, y = PAD+row*CELL;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 6; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+    ctx.beginPath(); ctx.arc(x, y, SR, 0, Math.PI*2);
+    if (color === 'black') {
+      const g = ctx.createRadialGradient(x-5,y-5,2,x,y,SR);
+      g.addColorStop(0,'#888'); g.addColorStop(0.3,'#333'); g.addColorStop(1,'#000');
+      ctx.fillStyle = g;
+    } else {
+      const g = ctx.createRadialGradient(x-5,y-5,2,x,y,SR);
+      g.addColorStop(0,'#fff'); g.addColorStop(0.4,'#eee'); g.addColorStop(1,'#bbb');
+      ctx.fillStyle = g;
+    }
+    ctx.fill();
+    ctx.shadowBlur = ctx.shadowOffsetX = ctx.shadowOffsetY = 0;
+    if (isLast) {
+      ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+      ctx.fillStyle = color==='black' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.5)';
+      ctx.fill();
+    }
+  }
+
+  // ── hover 预览 ─────────────────────────────────
+  let hoverRC = null;
+  canvas.addEventListener('mousemove', e => {
+    const pos = toRC(e);
+    if (!pos || !gs || gs.game_over) {
+      if (hoverRC) { hoverRC = null; renderState(); }
+      return;
+    }
+    if (gs.board[pos.r][pos.c] !== 0) { if(hoverRC){hoverRC=null;renderState();} return; }
+    if (MODE==='pvp' && gs.my_color !== gs.current_player) { if(hoverRC){hoverRC=null;renderState();} return; }
+    if (!hoverRC || hoverRC.r!==pos.r || hoverRC.c!==pos.c) {
+      hoverRC = pos; renderState();
+      ctx.globalAlpha = 0.32;
+      drawStone(pos.r, pos.c, gs.current_player === 'black' ? 'black' : 'white');
+      ctx.globalAlpha = 1;
+    }
+  });
+  canvas.addEventListener('mouseleave', () => { if(hoverRC){hoverRC=null;renderState();} });
+
+  canvas.addEventListener('click', e => { const p=toRC(e); if(p) handleClick(p.r,p.c); });
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    const p = toRC(e.changedTouches[0]);
+    if(p) handleClick(p.r,p.c);
+  }, { passive: false });
+
+  function toRC(e) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = CW / rect.width, sy = CW / rect.height;
+    const x = (e.clientX - rect.left)*sx, y = (e.clientY - rect.top)*sy;
+    const c = Math.round((x-PAD)/CELL), r = Math.round((y-PAD)/CELL);
+    if (r<0||r>=BOARD_SIZE||c<0||c>=BOARD_SIZE) return null;
+    return {r, c};
+  }
+
+  // ── 工具 ─────────────────────────────────────────
+  function setMsg(m) { document.getElementById('centerMsg').textContent = m; }
+
+  async function api(url, body, method) {
+    try {
+      const m = method || (body ? 'POST' : 'GET');
+      const opts = { method: m, headers:{'Content-Type':'application/json'} };
+      if (body && m === 'POST') opts.body = JSON.stringify(body);
+      const r = await fetch(url, opts);
+      return await r.json();
+    } catch(e) {
+      return { error: '网络错误' };
+    }
+  }
+
+  function copyRoomCode() {
+    const code = document.getElementById('roomCode').textContent;
+    navigator.clipboard?.writeText(code).then(() => setMsg('房间码已复制：' + code));
+  }
+
+  // ── 启动 ─────────────────────────────────────────
+  init();
+  </script>
+</body>
+</html>
